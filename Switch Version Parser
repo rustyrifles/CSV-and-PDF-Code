@@ -1,0 +1,560 @@
+# Written by Lee Smitherman to import a CSV of AKiPS exported switch data and produce a Bunnings Gold Image Standard report to screen and PDF
+# The following Libraries will need to be installed
+# python -m pip install reportlab
+# python -m pip install PyQt5
+
+
+
+import csv
+import sys
+import os
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.lib.colors import blue
+from reportlab.lib.colors import black
+from PyQt5.QtWidgets import *
+from datetime import datetime
+
+
+# Setup Variables used
+line_count = 0
+SW_eolcount = 0
+SW_compliant = 0
+SW_noncompliant = 0
+CNTWSC3560 = 0
+CNTWSC3560CX = 0
+CNTWSC3560V3 = 0
+CNTWSC3560X = 0
+CNTWSC3650 = 0
+CNTWSC3750G = 0
+CNTC3750GS1U = 0
+CNTWSC3750X = 0
+CNTWSC385024XSE = 0
+CNTWSC385048FL = 0
+CNTWSC385048PL = 0
+CNTC9300 = 0
+CNTC9500 = 0
+CNTnon = 0
+CNTtotal = 0
+CNTeol = 0
+CNTneol = 0
+CMPWSC3560 = 0
+CMPNWSC3560 = 0
+CMPWSC3560CX = 0
+CMPNWSC3560CX = 0
+CMPWSC3560V3 = 0
+CMPNWSC3560V3 = 0
+CMPWSC3560X = 0
+CMPNWSC3560X = 0
+CMPWSC3650 = 0
+CMPNWSC3650 = 0
+CMPWSC3750G = 0
+CMPNWSC3750G = 0
+CMPC3750GS1U = 0
+CMPNC3750GS1U = 0
+CMPWSC3750X = 0
+CMPNWSC3750X = 0
+CMPWSC385024XSE = 0
+CMPNWSC385024XSE = 0
+CMPWSC385048FL = 0
+CMPNWSC385048FL = 0
+CMPWSC385048PL = 0
+CMPNWSC385048PL = 0
+CMPC9300 = 0
+CMPNC9300 = 0
+CMPC9500 = 0
+CMPNC9500 = 0
+CMPTOTAL = 0
+CMPNTOTAL = 0
+Inchhigh = 760
+pageno = 1
+height = 0
+a = 0
+b = 0
+c = 0
+d = 0
+e = 0
+f = 0
+
+#This is the gold image Dictionary,  edit or add to this to update the versions
+SW_goldimage = {
+   "WS-C3560"       : "12.2(55)SE6",
+   "WS-C3560CX"      : "15.2(4)E6",
+   "WS-C3560V2"      : "12.2(55)SE12",
+   "WS-C3560X"       : "15.2(4)E10",
+   "WS-C3650"        : "16.9.5",
+   "WS-C3750G-"      : "12.2(55)SE8",
+   "WS-C3750G-S1U"   : "12.2(58)SE2",
+   "WS-C3750X"       : "15.0(1)SE3",
+   "WS-C3850-24XS-E" : "03.07.04E",
+   "WS-C3850-48F-L"  : "03.06.06E",
+   "WS-C3850-48P-L"  : "03.07.02E",
+   "C9300"           : "16.6.5",
+   "C9500"           : "16.9.2" }
+ 
+ 
+#This is the end of life dictionary for all of the models.  Set a Boolean value per model family
+SW_eol = {
+   "WS-C3560"        : True ,
+   "WS-C3560CX"      : False,
+   "WS-C3560V2"      : True,
+   "WS-C3560X"       : True,
+   "WS-C3650"        : False,
+   "WS-C3750G-"      : True,
+   "WS-C3750G-S1U"   : True,
+   "WS-C3750X"       : True,
+   "WS-C3850-24XS-E" : False,
+   "WS-C3850-48F-L"  : False,
+   "WS-C3850-48P-L"  : False,
+   "C9300"           : False,
+   "C9500"           : False } 
+   
+SW_eoldate = {
+   "WS-C3560"        : "2014" ,
+   "WS-C3560CX"      : "TBC",
+   "WS-C3560V2"      : "2017",
+   "WS-C3560X"       : "2019",
+   "WS-C3650"        : "Oct 2024",
+   "WS-C3750G-"      : "2016",
+   "WS-C3750G-S1U"   : "2016",
+   "WS-C3750X"       : "2017",
+   "WS-C3850-24XS-E" : "Oct 2023",
+   "WS-C3850-48F-L"  : "Oct 2023",
+   "WS-C3850-48P-L"  : "Oct 2023",
+   "C9300"           : "Not Announced",
+   "C9500"           : "Not Announced" } 
+      
+ 
+#This function cuts down code on writing to the PDF File for statistics   
+def draw(height,a,b,c,d,e,f):
+   canvas.drawString(30,height,a)
+   canvas.drawString(100,height,f"{b}")
+   canvas.drawString(200,height,f"{c}")
+   canvas.drawString(300,height,f"{f}")
+   canvas.drawString(400,height,f"{d}")
+   canvas.drawString(490,height,f"{e}")
+
+#This function is used per row iteration to write the non compliant switch information to the file
+def pdf():
+   global Inchhigh
+   global pageno
+   canvas.drawString(30,Inchhigh,f'{row["Device"]}')
+   canvas.drawString(200,Inchhigh,f'{row["Model"]}')
+   canvas.drawString(300,Inchhigh,f'{row["Software"]}')
+   canvas.drawString(420,Inchhigh,f'{tmp1}')
+   Inchhigh -=12
+   if Inchhigh <22:
+     canvas.setFillColor(blue)
+     canvas.drawString(30,10,f'Page:{pageno}')
+     canvas.showPage()
+     Inchhigh = 800
+     canvas.setFillColor(blue)
+     canvas.setFont("Times-Roman", 10)
+     canvas.drawString(30,820,"Device name")
+     canvas.drawString(200,820,"Model")
+     canvas.drawString(300,820,"Device Software Version")
+     canvas.drawString(420,820,"Bunnings Gold Standard Version")
+     canvas.setFont("Times-Roman", 8)
+     canvas.setFillColor(black)
+     pageno += 1
+ 
+# Begining of the main code 
+os.system('cls')
+print("Please ensure the switch.csv file is in the same directory as this Python File that you run")
+print("This is obtained by going to https://akips.internal.bunnings.com.au/")
+print("Select Reports then Device and finally Chassis, click CSV and rename the file to switch.csv")
+
+print("\nThis program will product a report on the screen as well as a PDF file in the Python Program location called Switch-Compliance.PDF")
+print("\n\n********************************************")
+print("* Please press <Return> once you are ready *")
+print("********************************************")
+input()
+     
+canvas = Canvas("Switch-Compliance.pdf")
+
+canvas.setFillColor(blue)
+canvas.setFont("Times-Roman", 20)
+canvas.drawString(140,500,"Bunnings Switch Compliancy Report")
+canvas.drawString(240,400,"Produced")
+now= datetime.now()
+dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+canvas.drawString(200,300,dt_string)
+canvas.setFont("Times-Roman", 8)
+canvas.drawString(480,20,"Written by Lee Smitherman")
+textobject = canvas.beginText(400,400) 
+canvas.showPage()
+
+
+
+
+
+os.system('cls')
+with open('switches.csv', mode='r') as csv_file:
+    csv_reader = csv.DictReader(csv_file)
+    print("Switches that are not to the Bunnings Gold Standard")
+    print("*"*140)
+    print("Device name                                Model                            Device Software Version       Bunnings Gold Standard Version")
+    print("*"*140)
+    canvas.setFillColor(blue)
+    canvas.setFont("Times-Roman", 10)
+    canvas.drawString(30,800,"Switches that are not compliant to the Bunnings Gold Software standard")
+    canvas.drawString(30,780,"Device name")
+    canvas.drawString(200,780,"Model")
+    canvas.drawString(300,780,"Device Software Version")
+    canvas.drawString(420,780,"Bunnings Gold Standard Version")
+    canvas.setFont("Times-Roman", 8)
+    canvas.setFillColor(black)
+    for row in csv_reader:
+       if line_count == 0:
+        line_count += 1
+       else:
+        row["Family"] = "TBC"
+        if 'WS-C3560-' in row["Model"]:
+           row["Family"] = "WS-C3560"
+           CNTWSC3560 += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3560'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3560'] in row["Software"]:
+              CMPWSC3560 += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC3560 += 1 
+              CMPNTOTAL += 1  
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3560']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3560CX' in row["Model"]:
+           row["Family"] = "WS-C3560CX"
+           CNTWSC3560CX += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3560CX'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3560CX'] in row["Software"]:
+              CMPWSC3560CX += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC3560CX += 1  
+              CMPNTOTAL += 1
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3560CX']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3560V2' in row["Model"]:
+           row["Family"] = "WS-C3560V3"
+           CNTWSC3560V3 += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3560V2'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3560V2'] in row["Software"]:
+              CMPWSC3560V3 += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC3560V3 += 1 
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3560V2']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3560X' in row["Model"]:
+           row["Family"] = "WS-C3560X"
+           CNTWSC3560X += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3560X'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3560X'] in row["Software"]:
+              CMPWSC3560X += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC3560X += 1 
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3560X']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3650' in row["Model"]:
+           row["Family"] = "WS-C3650"
+           CNTWSC3650 += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3650'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3650'] in row["Software"]:
+              CMPWSC3650 += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC3650 += 1  
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO' 
+              tmp1 = SW_goldimage['WS-C3650']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3750G-' in row["Model"]:
+           row["Family"] = "WS-C3750G"
+           CNTWSC3750G += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3750G-'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3750G-'] in row["Software"]:
+              CMPWSC3750G += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC3750G += 1
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3750G-']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'C3750G-S1U' in row["Model"]:
+           row["Family"] = "C3750G-S1U"
+           CNTC3750GS1U += 1
+           CNTtotal +=1
+           if SW_eol['C3750G-S1U'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['C3750G-S1U'] in row["Software"]:
+              CMPC3750GS1U += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNC3750GS1U +=1  
+              CMPNTOTAL += 1    
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['C3750G-S1U']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3750X' in row["Model"]:
+           row["Family"] = "WS-C3750X"
+           CNTWSC3750X += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3750X'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3750X'] in row["Software"]:
+              CMPWSC3750X += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC3750X += 1
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3750X']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3850-24XS-E' in row["Model"]:
+           row["Family"] = "WS-C3850-24XS-E"
+           CNTWSC385024XSE += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3850-24XS-E'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3850-24XS-E'] in row["Software"]:
+              CMPWSC385024XSE += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC385024XSE += 1
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'   
+              tmp1 = SW_goldimage['WS-C3850-24XS-E']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3850-48F-L' in row["Model"]:
+           row["Family"] = "WS-C3850-48F-L"
+           CNTWSC385048FL += 1 
+           CNTtotal +=1
+           if SW_eol['WS-C3850-48F-L'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3850-48F-L'] in row["Software"]:
+              CMPWSC385048FL += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC385048FL += 1 
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3850-48F-L']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'WS-C3850-48P-L' in row["Model"]:
+           row["Family"] = "WS-C3850-48P-L"  
+           CNTWSC385048PL += 1
+           CNTtotal +=1
+           if SW_eol['WS-C3850-48P-L'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['WS-C3850-48P-L'] in row["Software"]:
+              CMPWSC385048PL += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNWSC385048PL += 1 
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['WS-C3850-48P-L']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if '9300' in row["Model"]:
+           row["Family"] = "C9500" 
+           CNTC9300 += 1 
+           CNTtotal +=1
+           if SW_eol['C9300'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['C9300'] in row["Software"]:
+              CMPC9300 += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNC9300 += 1
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['C9300']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if '9500' in row["Model"]:
+           row["Family"] = "C9500" 
+           CNTC9500 += 1      
+           CNTtotal +=1   
+           if SW_eol['C9500'] == True:
+              CNTeol += 1
+           else:
+              CNTneol +=1
+           if SW_goldimage['C9500'] in row["Software"]:
+              CMPC9500 += 1
+              CMPTOTAL += 1
+              row['Compliant'] = 'YES'
+           else:
+              CMPNC9500 += 1
+              CMPNTOTAL += 1 
+              row['Compliant'] = 'NO'
+              tmp1 = SW_goldimage['C9500']
+              print(f'{row["Device"]:<40}{row["Model"]:<30}{row["Software"]:<30}{tmp1}')
+              pdf()
+        if 'TBC' in row["Family"]:
+           row["Family"] = "Non Standard" 
+           CNTnon += 1
+           CNTtotal +=1
+        line_count += 1
+canvas.showPage()   
+canvas.setFillColor(blue)
+canvas.setFont("Times-Roman", 8)
+canvas.drawString(30,10,f'Page:{pageno}')
+canvas.setFont("Times-Roman", 16)
+canvas.drawString(30,800,"Summary")
+canvas.setFont("Times-Roman", 14)
+canvas.drawString(30,780,"Bunnings Gold Image Standard")
+canvas.setFont("Times-Roman", 10)
+canvas.drawString(30,760,"Switch Model/Family             Bunnings Standard")
+canvas.setFont("Times-Roman", 8)
+canvas.setFillColor(black)
+print("\n\n")
+print("*"*140)  
+print("Summary\n\n")  
+print("*"*41)       
+print("Bunnings Gold Image Standard")
+print("*"*41) 
+pageno = 750
+for key in SW_goldimage:
+   print(f"{key:<25}",f"{SW_goldimage[key]:>15}")
+   canvas.drawString(30,pageno,f"{key}")
+   canvas.drawString(150,pageno,f"{SW_goldimage[key]}")
+   pageno -= 12
+
+canvas.drawString(30,550,f"Records Processed {line_count} lines")
+canvas.drawString(30,540,f"Total Number of Switches Imported {line_count}")
+canvas.setFillColor(blue)
+canvas.drawString(30,520,"Switch Model Stats")
+canvas.drawString(30,490,"Model")
+canvas.drawString(100,490,"Model Count")
+canvas.drawString(200,490,"End of Vuln/Sec Support")
+canvas.drawString(300,490,"End of Vuln/Sec Date")
+canvas.drawString(400,490,"Number Gold Compliant")
+canvas.drawString(490,490,"Number Non Gold Compliant")
+canvas.setFillColor(black)
+print("*"*41)    
+print(f'\nProcessed {line_count} lines.')
+print("*"*41)
+print(f'Total number of switches : {line_count}')
+print("*"*41)
+print("Switch Model Stats")
+print("\n\n                     Model Count             End of Vuln/Sec Support           Number Gold Compliant          Number Non Gold Compliant")
+print("                     ____________            _______________________           _____________________          __________________________")
+print(f"{'WS-C3560 :':<25}{CNTWSC3560:>4}{SW_eol['WS-C3560']:>22}{CMPWSC3560:>32}{CMPNWSC3560:>30}")
+draw(480,"WS-C3560",CNTWSC3560,SW_eol['WS-C3560'],CMPWSC3560,CMPNWSC3560,SW_eoldate['WS-C3560'])  
+print(f"{'WS-C3560CX :':<25}{CNTWSC3560CX:>4}{SW_eol['WS-C3560CX']:>22}{CMPWSC3560CX:>32}{CMPNWSC3560CX:>30}")   
+draw(470,"WS-C3560CX",CNTWSC3560CX,SW_eol['WS-C3560CX'],CMPWSC3560CX,CMPNWSC3560CX,SW_eoldate['WS-C3560CX'])  
+print(f"{'WS-C3560V2 :':<25}{CNTWSC3560V3:>4}{SW_eol['WS-C3560V2']:>22}{CMPWSC3560V3:>32}{CMPNWSC3560V3:>30}") 
+draw(460,"WS-C3560V2",CNTWSC3560V3,SW_eol['WS-C3560V2'],CMPWSC3560V3,CMPNWSC3560V3,SW_eoldate['WS-C3560V2'])  		  
+print(f"{'WS-C3560X :':<25}{CNTWSC3560X:>4}{SW_eol['WS-C3560X']:>22}{CMPWSC3560X:>32}{CMPNWSC3560X:>30}") 
+draw(450,"WS-C3560X",CNTWSC3560X,SW_eol['WS-C3560X'],CMPWSC3560X,CMPNWSC3560X,SW_eoldate['WS-C3560X']) 
+print(f"{'WS-C3650 :':<25}{CNTWSC3650:>4}{SW_eol['WS-C3650']:>22}{CMPWSC3650:>32}{CMPNWSC3650:>30}") 
+draw(440,"WS-C3650",CNTWSC3650,SW_eol['WS-C3650'],CMPWSC3650,CMPNWSC3650,SW_eoldate['WS-C3650']) 	  
+print(f"{'WS-C3750G :':<25}{CNTWSC3750G:>4}{SW_eol['WS-C3750G-']:>22}{CMPWSC3750G:>32}{CMPNWSC3750G:>30}")
+draw(430,"WS-C3750G",CNTWSC3750G,SW_eol['WS-C3750G-'],CMPWSC3750G,CMPNWSC3750G,SW_eoldate['WS-C3750G-'])		  
+print(f"{'WS-C3750G-S1U :':<25}{CNTC3750GS1U:>4}{SW_eol['WS-C3750G-S1U']:>22}{CMPC3750GS1U:>32}{CMPNC3750GS1U:>30}") 
+draw(420,"WS-C3750G-S1U",CNTC3750GS1U,SW_eol['WS-C3750G-S1U'],CMPC3750GS1U,CMPNC3750GS1U,SW_eoldate['WS-C3750G-S1U'])		  
+print(f"{'WS-C3750X :':<25}{CNTWSC3750X:>4}{SW_eol['WS-C3750X']:>22}{CMPWSC3750X:>32}{CMPNWSC3750X:>30}") 
+draw(410,"WS-C3750X",CNTWSC3750X,SW_eol['WS-C3750X'],CMPWSC3750X,CMPNWSC3750X,SW_eoldate['WS-C3750X'])	
+print(f"{'WS-C3850-24XS-E :':<25}{CNTWSC385024XSE:>4}{SW_eol['WS-C3850-24XS-E']:>22}{CMPWSC385024XSE:>32}{CMPNWSC385024XSE:>30}") 
+draw(400,"WS-C3850-24XS-E",CNTWSC385024XSE,SW_eol['WS-C3850-24XS-E'],CMPWSC385024XSE,CMPNWSC385024XSE,SW_eoldate['WS-C3850-24XS-E'])	
+print(f"{'WS-C3850-48F-L :':<25}{CNTWSC385048FL:>4}{SW_eol['WS-C3850-48F-L']:>22}{CMPWSC385048FL:>32}{CMPNWSC385048FL:>30}") 
+draw(390,"WS-C3850-48F-L",CNTWSC385048FL,SW_eol['WS-C3850-48F-L'],CMPWSC385048FL,CMPNWSC385048FL,SW_eoldate['WS-C3850-48F-L'])	
+print(f"{'WS-C3850-48P-L :':<25}{CNTWSC385048PL:>4}{SW_eol['WS-C3850-48P-L']:>22}{CMPWSC385048PL:>32}{CMPNWSC385048PL:>30}") 
+draw(380,"WS-C3850-48P-L",CNTWSC385048PL,SW_eol['WS-C3850-48P-L'],CMPWSC385048PL,CMPNWSC385048PL,SW_eoldate['WS-C3850-48P-L'])	
+print(f"{'C9300 :':<25}{CNTC9300:>4}{SW_eol['C9300']:>22}{CMPC9300:>32}{CMPNC9300:>30}")
+draw(370,"C9300",CNTC9300,SW_eol['C9300'],CMPC9300,CMPNC9300,SW_eoldate['C9300'])	
+print(f"{'C9500 :':<25}{CNTC9500:>4}{SW_eol['C9500']:>22}{CMPC9500:>32}{CMPNC9500:>30}",)
+draw(360,"C9500",CNTC9500,SW_eol['C9500'],CMPC9500,CMPNC9500,SW_eoldate['C9500'])
+print(f"{'Non Standard :':<25}{CNTnon:>4}")
+draw(350,"Non Standard",CNTnon,'','','','')
+print("*"*140)
+print(f"{'Total :':<25}{CNTtotal:>4}{CMPTOTAL:>54}{CMPNTOTAL:>30}{CMPTOTAL/(CMPTOTAL+CMPNTOTAL)*100:>10.2f}% Gold Compliant")
+print("*"*140)
+canvas.drawString(30,340,"="*120)
+canvas.drawString(30,330,f"Total:")
+canvas.drawString(100,330,f"{CNTtotal}")
+canvas.drawString(400,330,f"{CMPTOTAL}")
+canvas.drawString(490,330,f"{CMPNTOTAL}")
+canvas.drawString(510,330,f"{CMPTOTAL/(CMPTOTAL+CMPNTOTAL)*100:>10.2f}% Cmplt")
+canvas.drawString(30,320,"="*120)
+
+print("END OF LIFE STATS\n")
+print(f"Total Switches End of Vulnerability/Sec Support:{CNTeol}")
+print(f"Total Switches Not End of Vulnerability/Sec Support:{CNTneol}")
+print(f"Percent of Switches that are end of Vulnerability/Sec Support:{CNTeol/(CNTeol+CNTneol)*100:.2f}%")
+canvas.drawString(30,310,f"END OF LIFE STATS")
+canvas.drawString(30,290,f"Total Switches End of Vulnerability/Sec Support:")
+canvas.drawString(300,290,f"{CNTeol}")
+canvas.drawString(30,280,f"Total Switches Not End of Vulnerability/Sec Support:")
+canvas.drawString(300,280,f"{CNTneol}")
+canvas.drawString(30,270,f"Percent of Switches that are end of Vulnerability/Sec Support:")
+canvas.drawString(300,270,f"{CNTeol/(CNTeol+CNTneol)*100:.2f}%")
+
+
+canvas.save()
+
